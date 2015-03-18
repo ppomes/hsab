@@ -1,102 +1,60 @@
 module Main (main) where
 
 import Control.Monad
-import Data.Foldable (foldlM)
-import Data.Maybe
-import System.Console.GetOpt
-import System.Environment (getArgs, getProgName)
-import System.Exit
-import Control.Concurrent 
+import Control.Concurrent
 import Network.HTTP
 import Network.URI
-import System.Posix.Unistd
+import Control.Exception
+import Options.Applicative
 
-data Options = Options {
-  optNumber :: Int
-  , optConcurrency :: Int
-  , optURL :: String
-  } deriving Show
+newtype RequestCount = RequestCount Int
+newtype ThreadCount  = ThreadCount Int
+newtype URL          = URL String
 
-defaultOptions = Options {
-  optNumber = 1
-  , optConcurrency = 1
-  , optURL = "http://localhost"
-  }
+data Options = Options RequestCount ThreadCount URL
 
-options :: String -> [OptDescr (Options -> IO Options)]
-options helpMessage =
-  [ Option ['n'] ["numbers"]
-    (ReqArg (\str opts -> do
-                let n = read str
-                return $ opts { optNumber = n }) "num")
-    "number of request per thread"
-  , Option ['c'] ["concurrency"]
-    (ReqArg (\str opts -> do
-                let c = read str
-                return $ opts { optConcurrency = c }) "num")
-    "number of threads"
-  , Option ['u'] ["URL"]
-    (ReqArg (\str opts -> do
-	       let u = str
-               return $ opts { optURL = u }) "str")
-    "URL"
-  ]
+parseOps :: Parser Options
+parseOps = Options <$> requestCount <*> concurrency <*> url
+    where
+        requestCount = RequestCount <$> option auto (  long "numbers"
+                                                    <> short 'n'
+                                                    <> help "Number of requests per thread"
+                                                    <> value 1)
+        concurrency = ThreadCount <$> option auto (  long "concurrency"
+                                                  <> short 'c'
+                                                  <> help "Number of threads"
+                                                  <> value 1)
+        url = URL <$> strOption (  long "URL"
+                                <> short 'u'
+                                <> help "Queried URL"
+                                <> value "http://localhost")
 
-getUrl :: Options -> String
-getUrl ( Options { optURL = u }  ) = u
+downloadURL :: URL -> IO ()
+downloadURL (URL url) = case parseURI url of
+                            Nothing -> error ("Could not parse this url: " <> url)
+                            Just rq -> void $ simpleHTTP Request { rqURI     = rq
+                                                                 , rqMethod  = GET
+                                                                 , rqHeaders = []
+                                                                 , rqBody    = ""}
 
-getConcurrency :: Options -> Int
-getConcurrency ( Options { optConcurrency = c }  ) = c
+worker :: RequestCount -> URL -> IO ()
+worker (RequestCount n) url = do
+  myThreadId >>= print
+  replicateM_ n $ downloadURL url
 
-getNumber :: Options -> Int
-getNumber ( Options { optNumber = n } ) = n
-
-parseArgs :: IO Options
-parseArgs = do
-  argv <- getArgs
-  progName <- getProgName
-  let header = "Usage: " ++ progName ++ " [OPTION...]"
-  let helpMessage = usageInfo header (options "")
-  case getOpt RequireOrder (options helpMessage) argv of
-    (opts, [], []) -> foldlM (flip id) defaultOptions opts
-    (_, _, errs) -> ioError (userError (concat errs ++ helpMessage))
- 
-downloadURL :: String -> IO ()
-downloadURL url =
-   do resp <- simpleHTTP request
-      return (); 
-   where request = Request {rqURI = uri,
-		            rqMethod = GET,
-			    rqHeaders = [],
-			    rqBody = ""}
-	 uri = fromJust $ parseURI url
-
-worker :: Int -> String -> IO ()
-worker n url = 
-   do tId <- myThreadId
-      putStrLn (show tId)
-      replicateM_ n $ downloadURL url
-
-
-myForkIO :: IO () -> IO (MVar ())
+myForkIO :: IO a -> IO (MVar (Either SomeException a))
 myForkIO io = do
    mvar <- newEmptyMVar
-   forkFinally io (\_ -> putMVar mvar ())
+   void $ forkFinally io (putMVar mvar)
    return mvar
 
-waitvar :: MVar () -> IO ()
-waitvar mvar = readMVar mvar
-
 launch :: Options -> IO ()
-launch options = 
+launch (Options n (ThreadCount c) url) =
    do res <- replicateM c (myForkIO $ worker n url) -- fork requested number of threads
-      mapM waitvar res -- wait for threads 
-      return ();
-   where c = getConcurrency options
-         n = getNumber options
-         url = getUrl options
+      results <- mapM readMVar res -- wait for threads
+      print results
 
 main :: IO ()
-main = do
-  options <- parseArgs
-  launch options
+main = execParser opts >>= launch
+    where
+        opts = info (helper <*> parseOps) (fullDesc <> progDesc "An ab-like utility")
