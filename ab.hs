@@ -37,10 +37,11 @@ downloadURL (URL url) = case parseURI url of
                                                                  , rqHeaders = []
                                                                  , rqBody    = ""}
 
-worker :: RequestCount -> URL -> IO ()
+worker :: RequestCount -> URL -> IO ( String )
 worker (RequestCount n) url = do
-  myThreadId >>= print
   replicateM_ n $ downloadURL url
+  iId <- myThreadId
+  return ((show iId) ++ " completed " ++ (show n) ++ " request(s)")
 
 myForkIO :: IO a -> IO (MVar (Either SomeException a))
 myForkIO io = do
