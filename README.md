@@ -6,7 +6,11 @@ Small sample to start learning haskell: argv parsing, threading, http calls
 Compilation: 
 ghc -threaded --make ab.hs
 
-Usage: ab [OPTION...]
-  -n num  --numbers=num      number of requests per thread
-  -c num  --concurrency=num  number of threads
-  -u str  --URL=str          URL
+Usage: ab [-n|--numbers ARG] [-c|--concurrency ARG] [-u|--URL ARG]
+  An ab-like utility
+
+Available options:
+  -h,--help                Show this help text
+  -n,--numbers ARG         Number of requests per thread
+  -c,--concurrency ARG     Number of threads
+  -u,--URL ARG             Queried URL
