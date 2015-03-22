@@ -3,11 +3,7 @@ Apache ab-like utility in haskell
 
 Small sample to start learning haskell: argv parsing, threading, http calls
 
-Compilation: 
-ghc -threaded --make ab.hs
-
-Usage: ab [-n|--numbers ARG] [-c|--concurrency ARG] [-u|--URL ARG]
-  An ab-like utility
+Usage: hsab [-n|--numbers ARG] [-c|--concurrency ARG] [-u|--URL ARG]
 
 Available options:
   -h,--help                Show this help text
