@@ -7,6 +7,7 @@ import Network.URI
 import Control.Exception
 import Options.Applicative
 import Data.Either
+import Data.List
 
 newtype RequestCount = RequestCount Int
 newtype ThreadCount  = ThreadCount Int
@@ -52,9 +53,10 @@ myForkIO io = do
 
 launch :: Options -> IO ()
 launch (Options n (ThreadCount c) url) =
-   do res <- replicateM c (myForkIO $ worker n url) -- fork requested number of threads
-      results <- mapM readMVar res -- wait for threads
-      mapM_ putStrLn $ rights results -- display threads results
+   do res <- replicateM c (myForkIO $ worker n url)      -- fork requested number of threads
+      results <- mapM readMVar res                       -- wait for threads
+      mapM_ putStrLn $ nub ( map show $ lefts results )  -- display unique exceptions
+      mapM_ putStrLn $ rights results                    -- display threads results
 
 main :: IO ()
 main = execParser opts >>= launch
