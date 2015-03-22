@@ -6,6 +6,7 @@ import Network.HTTP
 import Network.URI
 import Control.Exception
 import Options.Applicative
+import Data.Either
 
 newtype RequestCount = RequestCount Int
 newtype ThreadCount  = ThreadCount Int
@@ -53,7 +54,7 @@ launch :: Options -> IO ()
 launch (Options n (ThreadCount c) url) =
    do res <- replicateM c (myForkIO $ worker n url) -- fork requested number of threads
       results <- mapM readMVar res -- wait for threads
-      print results
+      mapM_ putStrLn $ rights results -- display threads results
 
 main :: IO ()
 main = execParser opts >>= launch
