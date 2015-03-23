@@ -8,6 +8,7 @@ import Control.Exception
 import Options.Applicative
 import Data.Either
 import Data.List
+import Data.Time.Clock
 
 newtype RequestCount = RequestCount Int
 newtype ThreadCount  = ThreadCount Int
@@ -41,9 +42,12 @@ downloadURL (URL url) = case parseURI url of
 
 worker :: RequestCount -> URL -> IO ( String )
 worker (RequestCount n) url = do
+  start <- getCurrentTime
   replicateM_ n $ downloadURL url
+  end   <- getCurrentTime
+  let diff = diffUTCTime end start
   iId <- myThreadId
-  return ((show iId) ++ " completed " ++ (show n) ++ " request(s)")
+  return ((show iId) ++ " completed " ++ (show n) ++ " request(s) in " ++ (show diff) )
 
 myForkIO :: IO a -> IO (MVar (Either SomeException a))
 myForkIO io = do
